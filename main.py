@@ -1,16 +1,39 @@
-# This is a sample Python script.
+from dotenv import load_dotenv
+from bs4 import BeautifulSoup
+import requests
+import smtplib
+from email.message import EmailMessage
+import os
 
-# Press Ctrl+F5 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+load_dotenv()
 
+AMAZON_URL = "https://appbrewery.github.io/instant_pot/"
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press F9 to toggle the breakpoint.
+res = requests.get(AMAZON_URL)
+res.raise_for_status()
 
+soup = BeautifulSoup(res.text, "html.parser")
+product_title = soup.find(name="span", id="productTitle").getText()
+price = soup.find(name="span", class_="aok-offscreen").getText()
+price = float(price.split("$")[-1])
+print(product_title)
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
+def send_email(title: str, product_price: float) -> None:
+    body = f"{title} is now ${product_price}"
+    msg = EmailMessage()
+    msg["Subject"] = "Amazon Price Alert!"
+    msg["From"] = os.getenv("GMAIL_ADDRESS")
+    msg["To"] = os.getenv("GMAIL_ADDRESS")
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    msg.set_content(body)
+
+    with smtplib.SMTP(os.getenv("SMTP_HOST"), port=587) as connection:
+        connection.starttls()
+        connection.login(
+            user=os.getenv("GMAIL_ADDRESS"),
+            password=os.getenv("GMAIL_APP_PASSWORD")
+        )
+        connection.send_message(msg)
+
+if price < 100.00:
+    send_email(product_title, price)
